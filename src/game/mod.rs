@@ -167,8 +167,11 @@ impl Game {
             }
         }) as Box<dyn FnMut(f64)>));
         
+        // 最初のアニメーションフレームをリクエストするために新しいウィンドウインスタンスを取得
+        let window_for_first_request = web_sys::window().ok_or_else(|| JsValue::from_str("最初のリクエスト用ウィンドウが見つかりません"))?;
+        
         // アニメーションフレームをリクエスト
-        window.request_animation_frame(g.borrow().as_ref().unwrap().as_ref().unchecked_ref())?;
+        window_for_first_request.request_animation_frame(g.borrow().as_ref().unwrap().as_ref().unchecked_ref())?;
         
         // クロージャをドロップされないように保持
         self._game_loop = Some(g.borrow_mut().take().unwrap());

@@ -202,18 +202,30 @@ fn add_cards_to_stock(
     stock_id: EntityId,
     cards: &[EntityId],
 ) -> Result<(), JsValue> {
-    if let Some(stock) = world.get_component_mut::<StackContainer>(stock_id) {
-        let transform = world.get_component::<Transform>(stock_id).unwrap();
-        let x = transform.position.x;
-        let y = transform.position.y;
-        
-        // 全てのカードをストックに追加
-        for (i, &card_id) in cards.iter().enumerate() {
-            // カードの位置を設定
-            card::set_card_position(world, card_id, x, y, i as i32)?;
-            
+    // 先にトランスフォーム情報を取得
+    let x;
+    let y;
+    
+    if let Some(transform) = world.get_component::<Transform>(stock_id) {
+        x = transform.position.x;
+        y = transform.position.y;
+    } else {
+        return Err(JsValue::from_str("ストックのトランスフォームが見つかりません"));
+    }
+    
+    // 全てのカードをストックに追加
+    for (i, &card_id) in cards.iter().enumerate() {
+        // カードの位置を設定
+        card::set_card_position(world, card_id, x, y, i as i32)?;
+    }
+    
+    // 別のスコープでスタックコンテナを取得して更新
+    {
+        if let Some(stock) = world.get_component_mut::<StackContainer>(stock_id) {
             // カードをストックに追加
-            stock.add_card(card_id);
+            for &card_id in cards.iter() {
+                stock.add_card(card_id);
+            }
         }
     }
     

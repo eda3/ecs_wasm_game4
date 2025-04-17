@@ -32,7 +32,6 @@ impl InputSystem {
     fn process_click(
         &mut self,
         world: &mut World,
-        resources: &mut ResourceManager,
         entity_id: EntityId,
     ) -> Result<(), JsValue> {
         // クリック可能コンポーネントを持つかチェック
@@ -139,7 +138,7 @@ impl System for InputSystem {
                 input_state.mouse_position,
             ) {
                 self.clicked_entity = Some(entity_id);
-                self.process_click(world, _resources, entity_id)?;
+                self.process_click(world, entity_id)?;
             }
         }
         
@@ -312,19 +311,53 @@ impl DragSystem {
                     self.process_drop(world, entity_id, target_id)?;
                 } else {
                     // 無効なドロップの場合は元の位置に戻す
-                    if let Some(draggable) = world.get_component_mut::<Draggable>(entity_id) {
+                    // 先に必要なデータを取得
+                    let original_position;
+                    let original_z_index;
+                    
+                    {
+                        // Draggableから元の位置情報を取得
+                        if let Some(draggable) = world.get_component::<Draggable>(entity_id) {
+                            original_position = draggable.original_position;
+                            original_z_index = draggable.original_z_index;
+                        } else {
+                            // データがなければ処理を終了
+                            self.dragged_entity = None;
+                            return Ok(());
+                        }
+                    }
+                    
+                    // 別のスコープでTransformを更新
+                    {
                         if let Some(transform) = world.get_component_mut::<Transform>(entity_id) {
-                            transform.position = draggable.original_position;
-                            transform.z_index = draggable.original_z_index;
+                            transform.position = original_position;
+                            transform.z_index = original_z_index;
                         }
                     }
                 }
             } else {
                 // ドロップターゲットがない場合は元の位置に戻す
-                if let Some(draggable) = world.get_component_mut::<Draggable>(entity_id) {
+                // 先に必要なデータを取得
+                let original_position;
+                let original_z_index;
+                
+                {
+                    // Draggableから元の位置情報を取得
+                    if let Some(draggable) = world.get_component::<Draggable>(entity_id) {
+                        original_position = draggable.original_position;
+                        original_z_index = draggable.original_z_index;
+                    } else {
+                        // データがなければ処理を終了
+                        self.dragged_entity = None;
+                        return Ok(());
+                    }
+                }
+                
+                // 別のスコープでTransformを更新
+                {
                     if let Some(transform) = world.get_component_mut::<Transform>(entity_id) {
-                        transform.position = draggable.original_position;
-                        transform.z_index = draggable.original_z_index;
+                        transform.position = original_position;
+                        transform.z_index = original_z_index;
                     }
                 }
             }

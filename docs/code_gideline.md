@@ -534,6 +534,73 @@ let handler = |_event: Event, state: &mut GameState| {
     let _ = self.context.restore();
     ```
 
+### 1.7 同時借用の問題と解決策
+
+Rustの借用チェッカーは安全性を保証する重要な機能ですが、いくつかの一般的なパターンで問題が発生します。
+
+#### 同一オブジェクトに対する複数の参照
+
+- **問題のあるコード: 同じWorldに対して同時に可変借用と不変借用を行っている**
+
+```rust
+if let Some(stock) = world.get_component_mut::<StackContainer>(stock_id) {
+    let transform = world.get_component::<Transform>(stock_id).unwrap();
+    // stock（可変参照）とtransform（不変参照）を同時に使用しようとしてエラー
+}
+```
+
+- **修正方法: 先に必要なデータをコピーしてから可変参照を取得する**
+
+```rust
+// 1. 先に不変参照でデータを取得
+let x;
+let y;
+if let Some(transform) = world.get_component::<Transform>(stock_id) {
+    x = transform.position.x;
+    y = transform.position.y;
+} else {
+    return Err(JsValue::from_str("トランスフォームが見つかりません"));
+}
+
+// 2. 必要なデータをコピーした後に可変参照を取得
+if let Some(stock) = world.get_component_mut::<StackContainer>(stock_id) {
+    // stockに対する操作...
+}
+```
+
+#### 同じエンティティの複数コンポーネントへの可変参照
+
+- **問題のあるコード: 同じエンティティの異なるコンポーネントに対して同時に可変参照を取得**
+
+```rust
+if let Some(draggable) = world.get_component_mut::<Draggable>(entity_id) {
+    if let Some(transform) = world.get_component_mut::<Transform>(entity_id) {
+        // Rustの借用チェッカーはEntityIdレベルの細かい所有権を追跡できないためエラー
+    }
+}
+```
+
+- **修正方法: 1つのスコープで必要なデータを取得し、別のスコープで更新する**
+
+```rust
+// 1. 最初のスコープでデータを取得
+let position;
+{
+    if let Some(transform) = world.get_component::<Transform>(entity_id) {
+        position = transform.position;
+    } else {
+        return;
+    }
+}
+
+// 2. 別のスコープでデータを更新
+{
+    if let Some(draggable) = world.get_component_mut::<Draggable>(entity_id) {
+        draggable.original_position = position;
+    }
+}
+```
+
 ## 2. エラーハンドリング
 
 ### 2.1 エラー型
