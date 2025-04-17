@@ -1954,3 +1954,81 @@ pub struct BandwidthUsage {
   - `GameState`は構造体（Resourceとして実装）
   - `GameStateType`は列挙型（ゲームの状態を表現）
   - アクセサメソッドを使用して適切に状態を操作する
+
+## 2023年12月10日更新
+
+### 1. 未使用変数の適切な管理
+以下の変更を実施して、未使用変数に関連する警告を解消しました：
+
+- `src/render/renderer.rs`: render関数のresourcesパラメータに`_`プレフィックスを追加
+- `src/render/renderer.rs`: render_ui関数のworldパラメータに`_`プレフィックスを追加
+- `src/render/systems.rs`: card_infoとrenderable変数に`_`プレフィックスを追加
+- `src/input/input_handler.rs`: world, world_up, world_move変数に`_`プレフィックスを追加
+- `src/input/input_handler.rs`: 不要なmut修飾子を削除
+- `src/input/systems.rs`: stack変数に`_`プレフィックスを追加
+- `src/input/systems.rs`: resourcesパラメータに`_`プレフィックスを追加
+- `src/input/systems.rs`: delta_timeパラメータに`_`プレフィックスを追加
+- `src/input/systems.rs`: top_card_id変数に`_`プレフィックスを追加
+
+未使用変数に対しては今後も継続して`_`プレフィックスを追加するか、完全に削除することで警告を解消していきます。
+
+### 所有権の衝突を回避するベストプラクティス
+
+ECSアーキテクチャでは、同じ世界（World）オブジェクトに対する複数の参照が必要になることが多く、特にミュータブル参照とイミュータブル参照が競合することがよくあります。このような競合を解決するための戦略をいくつか紹介します：
+
+#### 1. データの事前コピー
+イテレーションする前にデータをクローンし、その後でワールドを変更することで、参照の競合を避けることができます。
+
+```rust
+// 問題のあるコード：イミュータブル参照を保持したままミュータブル参照を取得しようとしている
+for (i, &card_id) in stack.cards.iter().enumerate() {
+    if let Some(card_transform) = world.get_component_mut::<Transform>(card_id) {
+        // エラー: stackはworldからの参照を保持しているため、同じworldをミュータブルに借用できない
+    }
+}
+
+// 解決策：先にデータをコピーしてから操作する
+let card_ids = stack.cards.clone();
+for (i, &card_id) in card_ids.iter().enumerate() {
+    if let Some(card_transform) = world.get_component_mut::<Transform>(card_id) {
+        // OK: worldの参照を保持していないのでミュータブル参照を取得できる
+    }
+}
+```
+
+#### 2. スコープを分割する
+ブロックを使ってスコープを分割することで、借用チェッカーに参照の寿命を明示的に伝えることができます。
+
+```rust
+// 問題のあるコード
+let component1 = world.get_component::<Component1>(entity);
+let component2 = world.get_component_mut::<Component2>(entity); // エラー
+
+// 解決策：スコープを分割する
+{
+    let component1 = world.get_component::<Component1>(entity);
+    // component1を使った処理
+} // component1のスコープが終了
+
+{
+    let component2 = world.get_component_mut::<Component2>(entity); // OK
+    // component2を使った処理
+}
+```
+
+#### 3. インデックスベースのアクセス
+エンティティや成分へのアクセスにインデックスを使用し、必要なデータを引き出した後でワールドを変更することも有効です。
+
+```rust
+// インデックスを先に取得
+let entity_indexes: Vec<_> = world.get_entities_with_component::<Component>().collect();
+
+// 後でそのインデックスを使ってコンポーネントにアクセス
+for &entity_id in &entity_indexes {
+    if let Some(component) = world.get_component_mut::<Component>(entity_id) {
+        // 処理
+    }
+}
+```
+
+これらの戦略を適用することで、Rustの所有権システムとボローチェッカーと協調しながら、ECSパターンを効果的に実装することができます。

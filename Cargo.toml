@@ -1,9 +1,64 @@
 [package]
 name = "ecs_wasm_game4"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+description = "マルチプレイソリティアゲーム with Rust WebAssembly"
+authors = ["ギャルエンジニア"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-js-sys = "0.3.77"
+# WebAssembly関連
 wasm-bindgen = "0.2.100"
-web-sys = "0.3.77"
+js-sys = "0.3.77"
+web-sys = { version = "0.3.77", features = [
+    "console", 
+    "Document", 
+    "Element", 
+    "HtmlElement", 
+    "Node", 
+    "Window", 
+    "HtmlCanvasElement", 
+    "CanvasRenderingContext2d", 
+    "Performance", 
+    "EventTarget", 
+    "MouseEvent", 
+    "KeyboardEvent", 
+    "CssStyleDeclaration",
+    "DomRect",
+    "WebSocket",
+    "Event",
+    "MessageEvent",
+    "BinaryType",
+    "ErrorEvent",
+    "CloseEvent"
+]}
+
+# シリアライズ/デシリアライズ
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# ローカルストレージなどのブラウザAPI
+# gloo = { version = "0.10.0", features = ["storage"] }
+
+# ランダム値生成
+getrandom = { version = "0.2", features = ["js"] }
+rand = "0.8"
+
+# ロギング
+console_error_panic_hook = "0.1.7"
+wasm-logger = "0.2"
+log = "0.4"
+
+# その他便利ツール
+wasm-bindgen-futures = "0.4"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
+[profile.release]
+opt-level = "s"
