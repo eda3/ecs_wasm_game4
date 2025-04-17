@@ -201,6 +201,7 @@ fn remove_entity_from_storage(storage: &mut dyn Any, entity_id: &EntityId) {
     try_downcast_and_remove!(StackContainer);
     try_downcast_and_remove!(Position);
     try_downcast_and_remove!(Sprite);
+    try_downcast_and_remove!(Droppable);
 }
 
 // ヘルパー関数：Any型のストレージをクリア
@@ -224,6 +225,7 @@ fn clear_storage(storage: &mut dyn Any) {
     try_downcast_and_clear!(StackContainer);
     try_downcast_and_clear!(Position);
     try_downcast_and_clear!(Sprite);
+    try_downcast_and_clear!(Droppable);
 }
 
 //
@@ -424,6 +426,9 @@ pub struct Draggable {
     pub is_dragging: bool,
     pub drag_offset: Vec2,  // ドラッグ開始位置からのオフセット
     pub original_position: Vec2,  // ドラッグ開始前の位置
+    pub original_z_index: i32,  // ドラッグ開始前のZ-index
+    pub width: f64,  // ドラッグ可能な領域の幅
+    pub height: f64,  // ドラッグ可能な領域の高さ
     pub drag_children: bool,  // 子要素も一緒にドラッグするか
 }
 
@@ -433,8 +438,17 @@ impl Draggable {
             is_dragging: false,
             drag_offset: Vec2::zero(),
             original_position: Vec2::zero(),
+            original_z_index: 0,
+            width: 0.0,
+            height: 0.0,
             drag_children: false,
         }
+    }
+    
+    pub fn with_size(mut self, width: f64, height: f64) -> Self {
+        self.width = width;
+        self.height = height;
+        self
     }
     
     pub fn with_drag_children(mut self) -> Self {
@@ -639,5 +653,42 @@ impl Sprite {
 impl Component for Sprite {
     fn name(&self) -> &'static str {
         "Sprite"
+    }
+}
+
+/// ドロップ可能なコンポーネント
+/// エンティティをドロップ対象として指定する
+#[derive(Clone, Debug)]
+pub struct Droppable {
+    pub width: f64,  // ドロップ可能な領域の幅
+    pub height: f64,  // ドロップ可能な領域の高さ
+    pub drop_types: Vec<usize>,  // 受け入れ可能なドラッグタイプ（将来の拡張用）
+    pub is_active: bool,  // ドロップが現在有効かどうか
+}
+
+impl Droppable {
+    pub fn new(width: f64, height: f64) -> Self {
+        Self {
+            width,
+            height,
+            drop_types: Vec::new(),
+            is_active: true,
+        }
+    }
+    
+    pub fn with_drop_types(mut self, types: Vec<usize>) -> Self {
+        self.drop_types = types;
+        self
+    }
+    
+    pub fn with_active(mut self, active: bool) -> Self {
+        self.is_active = active;
+        self
+    }
+}
+
+impl Component for Droppable {
+    fn name(&self) -> &'static str {
+        "Droppable"
     }
 } 

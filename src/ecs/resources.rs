@@ -81,6 +81,7 @@ pub struct InputState {
     pub mouse_buttons: [bool; 3], // [左, 中, 右]
     pub mouse_down_position: Vec2,
     pub is_mouse_down: bool,
+    pub is_mouse_clicked: bool,  // マウスクリックが発生したかどうか（1フレームだけtrue）
     pub keys_pressed: HashMap<String, bool>,
     pub touch_position: Vec2,
     pub is_touch_active: bool,
@@ -94,6 +95,7 @@ impl InputState {
             mouse_buttons: [false; 3],
             mouse_down_position: Vec2::zero(),
             is_mouse_down: false,
+            is_mouse_clicked: false,
             keys_pressed: HashMap::new(),
             touch_position: Vec2::zero(),
             is_touch_active: false,

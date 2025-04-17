@@ -198,28 +198,41 @@ impl DragSystem {
     
     /// ドラッグを開始
     fn start_drag(&mut self, world: &mut World, entity_id: EntityId, mouse_position: Vec2) -> Result<(), JsValue> {
-        // エンティティのドラッグ可能コンポーネントを更新
-        if let Some(draggable) = world.get_component_mut::<Draggable>(entity_id) {
-            draggable.is_dragging = true;
-            
-            // エンティティの現在位置を取得
+        // 必要な情報を先に取得
+        let transform_position;
+        let transform_z_index;
+        
+        // 1. エンティティの現在位置を先に取得
+        {
             if let Some(transform) = world.get_component::<Transform>(entity_id) {
-                draggable.original_position = transform.position;
-                
-                // ドラッグオフセットを計算（クリック位置とエンティティの左上の差）
-                draggable.drag_offset = Vec2::new(
-                    mouse_position.x - transform.position.x,
-                    mouse_position.y - transform.position.y,
-                );
+                transform_position = transform.position;
+                transform_z_index = transform.z_index;
+            } else {
+                // Transformがなければ処理を中止
+                return Ok(());
             }
         }
         
-        // レンダラブルコンポーネントの不透明度を下げる
+        // 2. ドラッグオフセットを計算
+        let drag_offset = Vec2::new(
+            mouse_position.x - transform_position.x,
+            mouse_position.y - transform_position.y,
+        );
+        
+        // 3. ドラッグ可能コンポーネントを更新
+        if let Some(draggable) = world.get_component_mut::<Draggable>(entity_id) {
+            draggable.is_dragging = true;
+            draggable.original_position = transform_position;
+            draggable.original_z_index = transform_z_index;
+            draggable.drag_offset = drag_offset;
+        }
+        
+        // 4. レンダラブルコンポーネントの不透明度を下げる
         if let Some(renderable) = world.get_component_mut::<crate::ecs::component::Renderable>(entity_id) {
             renderable.opacity = DRAG_OPACITY;
         }
         
-        // ドラッグ中のエンティティを記録
+        // 5. ドラッグ中のエンティティを記録
         self.dragged_entity = Some(entity_id);
         self.drag_start_position = mouse_position;
         self.drag_started = true;
@@ -230,37 +243,35 @@ impl DragSystem {
     }
     
     /// ドラッグ中の更新
-    fn update_drag(&mut self, world: &mut World, mouse_position: Vec2) -> Result<(), JsValue> {
-        if let Some(entity_id) = self.dragged_entity {
-            // ドラッグオフセットを取得
-            let drag_offset = if let Some(draggable) = world.get_component::<Draggable>(entity_id) {
-                draggable.drag_offset
-            } else {
-                Vec2::zero() // デフォルト値
-            };
+    fn update_drag(&mut self, world: &mut World, entity_id: EntityId, mouse_position: Vec2) -> Result<(), JsValue> {
+        // ドラッグオフセットを取得
+        let drag_offset = if let Some(draggable) = world.get_component::<Draggable>(entity_id) {
+            draggable.drag_offset
+        } else {
+            Vec2::zero() // デフォルト値
+        };
+        
+        // エンティティの位置を更新
+        if let Some(transform) = world.get_component_mut::<Transform>(entity_id) {
+            transform.position.x = mouse_position.x - drag_offset.x;
+            transform.position.y = mouse_position.y - drag_offset.y;
             
-            // エンティティの位置を更新
-            if let Some(transform) = world.get_component_mut::<Transform>(entity_id) {
-                transform.position.x = mouse_position.x - drag_offset.x;
-                transform.position.y = mouse_position.y - drag_offset.y;
-                
-                // Z-indexを大きくして最前面に表示
-                transform.z_index = 1000;
-            }
-            
-            // ドラッグ中の子要素も一緒に移動
-            let drag_children = if let Some(draggable) = world.get_component::<Draggable>(entity_id) {
-                draggable.drag_children
-            } else {
-                false
-            };
-            
-            if drag_children {
-                // スタックコンテナを持つ場合、カードを一緒に移動
-                if let Some(_stack) = world.get_component::<StackContainer>(entity_id) {
-                    // スタック内のカードも移動
-                    // 実際の実装はもっと複雑になるが、ここではシンプルに
-                }
+            // Z-indexを大きくして最前面に表示
+            transform.z_index = 1000;
+        }
+        
+        // ドラッグ中の子要素も一緒に移動
+        let drag_children = if let Some(draggable) = world.get_component::<Draggable>(entity_id) {
+            draggable.drag_children
+        } else {
+            false
+        };
+        
+        if drag_children {
+            // スタックコンテナを持つ場合、カードを一緒に移動
+            if let Some(_stack) = world.get_component::<StackContainer>(entity_id) {
+                // スタック内のカードも移動
+                // 実際の実装はもっと複雑になるが、ここではシンプルに
             }
         }
         
@@ -497,7 +508,14 @@ impl System for DragSystem {
 
 impl DragSystem {
     fn update(&mut self, world: &mut World, resource_manager: &ResourceManager) -> Result<(), JsValue> {
-        let input_state = resource_manager.get_resource::<InputState>();
+        let input_state = resource_manager.get::<InputState>();
+        
+        // input_stateがNoneの場合は早期リターン
+        if input_state.is_none() {
+            return Ok(());
+        }
+        
+        let input_state = input_state.unwrap();
         
         // マウスイベントを処理
         // クリックされたエンティティを見つける
@@ -516,7 +534,7 @@ impl DragSystem {
         if let Some(entity_id) = self.dragged_entity {
             if input_state.is_mouse_down {
                 // ドラッグ中の更新
-                self.update_drag(world, input_state.mouse_position)?;
+                self.update_drag(world, entity_id, input_state.mouse_position)?;
             }
             // マウスボタンが離された瞬間
             else if !input_state.is_mouse_down {
