@@ -1,0 +1,10 @@
+{
+    "name": "ecs-wasm-game",
+    "version": "1.0.0",
+    "description": "ECSフレームワークを使ったWasmゲーム",
+    "scripts": {
+        "dev": "cd www && npm run dev",
+        "build": "wasm-pack build --target web --out-dir ./www/pkg"
+    },
+    "dependencies": {}
+}

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>ソリティアゲーム - ECS Wasm Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #0a5c36;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            color: white;
+        }
+
+        .game-container {
+            width: 800px;
+            height: 600px;
+            margin-top: 20px;
+            position: relative;
+        }
+
+        .card {
+            width: 80px;
+            height: 120px;
+            background-color: white;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: absolute;
+            cursor: pointer;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+            color: black;
+            font-size: 18px;
+        }
+
+        .card.red {
+            color: red;
+        }
+
+        .controls {
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 8px 16px;
+            margin: 0 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>ソリティア</h1>
+    <div class="game-container" id="game-container"></div>
+    <div class="controls">
+        <button id="new-game">新しいゲーム</button>
+        <button id="undo">元に戻す</button>
+    </div>
+
+    <script>
+        // ゲームが読み込まれるまで待機
+        async function init() {
+            try {
+                // WebAssemblyモジュールを読み込む
+                const wasmModule = await import('./pkg/ecs_wasm_game.js');
+                await wasmModule.default();
+
+                // ゲームを初期化
+                wasmModule.init_game();
+
+                // ボタンにイベントリスナーを追加
+                document.getElementById('new-game').addEventListener('click', () => {
+                    wasmModule.new_game();
+                });
+
+                document.getElementById('undo').addEventListener('click', () => {
+                    wasmModule.undo_move();
+                });
+
+                // WebSocketの設定
+                const socket = new WebSocket('ws://162.43.8.148:8101');
+
+                socket.onopen = function (e) {
+                    console.log('WebSocket接続が確立されました');
+                };
+
+                socket.onmessage = function (event) {
+                    console.log('サーバーからメッセージを受信:', event.data);
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'game_state') {
+                            // ゲーム状態を更新
+                            wasmModule.update_game_state(data.state);
+                        }
+                    } catch (e) {
+                        console.error('メッセージの処理中にエラーが発生しました:', e);
+                    }
+                };
+
+                socket.onclose = function (event) {
+                    console.log('WebSocket接続が閉じられました');
+                };
+
+                socket.onerror = function (error) {
+                    console.error('WebSocketエラー:', error);
+                };
+
+                // ゲームコンテナにイベントリスナーを追加
+                const gameContainer = document.getElementById('game-container');
+                gameContainer.addEventListener('click', (event) => {
+                    // クリック位置をWasmに送信
+                    const rect = gameContainer.getBoundingClientRect();
+                    const x = event.clientX - rect.left;
+                    const y = event.clientY - rect.top;
+                    wasmModule.handle_click(x, y);
+                });
+
+            } catch (e) {
+                console.error('初期化中にエラーが発生しました:', e);
+            }
+        }
+
+        // ページ読み込み完了時にゲームを初期化
+        window.addEventListener('load', init);
+    </script>
+</body>
+
+</html>
