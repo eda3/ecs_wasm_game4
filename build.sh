@@ -7,7 +7,7 @@ echo "🦀 ECS Wasmゲームのビルドを開始します 🎮"
 
 # Rustプロジェクトをビルドしてwasmを生成
 echo "📦 Rustコードをコンパイルしています..."
-wasm-pack build --target web --out-dir ./www/pkg
+RUSTFLAGS=--cfg=web_sys_unstable_apis wasm-pack build --target web --out-name ecs_wasm_game4 --out-dir ./www/pkg
 
 # フロントエンドの依存関係をインストール
 echo "📚 フロントエンドの依存関係をインストールしています..."

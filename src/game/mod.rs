@@ -65,16 +65,41 @@ impl Game {
         info!("🎮 新しいゲームを作成中... canvas_id: {}", canvas_id);
         
         // DOMからキャンバス要素を取得
-        let document = web_sys::window()
-            .ok_or_else(|| JsValue::from_str("ウィンドウが見つかりません"))?
+        let window = web_sys::window()
+            .ok_or_else(|| {
+                let err_msg = "ウィンドウが見つかりません";
+                error!("エラー: {}", err_msg);
+                JsValue::from_str(err_msg)
+            })?;
+            
+        let document = window
             .document()
-            .ok_or_else(|| JsValue::from_str("ドキュメントが見つかりません"))?;
+            .ok_or_else(|| {
+                let err_msg = "ドキュメントが見つかりません";
+                error!("エラー: {}", err_msg);
+                JsValue::from_str(err_msg)
+            })?;
+        
+        info!("キャンバス要素を検索中: #{}", canvas_id);
+        let canvas_element = document.get_element_by_id(canvas_id);
+        
+        if canvas_element.is_none() {
+            let err_msg = format!("ID: '{}' のキャンバス要素が見つかりません。HTMLに対応する要素が存在することを確認してください。", canvas_id);
+            error!("エラー: {}", err_msg);
+            return Err(JsValue::from_str(&err_msg));
+        }
+        
+        let canvas = canvas_element
+            .unwrap()
+            .dyn_into::<HtmlCanvasElement>()
+            .map_err(|_| {
+                let err_msg = format!("ID: '{}' の要素はHtmlCanvasElementではありません", canvas_id);
+                error!("エラー: {}", err_msg);
+                JsValue::from_str(&err_msg)
+            })?;
             
-        let canvas = document
-            .get_element_by_id(canvas_id)
-            .ok_or_else(|| JsValue::from_str(&format!("ID: {} のキャンバスが見つかりません", canvas_id)))?
-            .dyn_into::<HtmlCanvasElement>()?;
-            
+        info!("キャンバス要素を取得しました: {}x{}", canvas.width(), canvas.height());
+        
         // キャンバスサイズを設定
         canvas.set_width(crate::constants::CANVAS_WIDTH);
         canvas.set_height(crate::constants::CANVAS_HEIGHT);
@@ -82,8 +107,17 @@ impl Game {
         // 2Dコンテキストを取得
         let context = canvas
             .get_context("2d")?
-            .ok_or_else(|| JsValue::from_str("2Dコンテキストを取得できません"))?
-            .dyn_into::<CanvasRenderingContext2d>()?;
+            .ok_or_else(|| {
+                let err_msg = "2Dコンテキストを取得できません";
+                error!("エラー: {}", err_msg);
+                JsValue::from_str(err_msg)
+            })?
+            .dyn_into::<CanvasRenderingContext2d>()
+            .map_err(|_| {
+                let err_msg = "コンテキストをCanvasRenderingContext2dに変換できません";
+                error!("エラー: {}", err_msg);
+                JsValue::from_str(err_msg)
+            })?;
             
         // ECSコンポーネントを初期化
         let world = Rc::new(RefCell::new(World::new()));

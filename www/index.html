@@ -58,7 +58,7 @@
 
 <body>
     <h1>ソリティア</h1>
-    <div class="game-container" id="game-container"></div>
+    <canvas id="game-container" class="game-container" width="800" height="600"></canvas>
     <div class="controls">
         <button id="new-game">新しいゲーム</button>
         <button id="undo">元に戻す</button>
@@ -69,11 +69,11 @@
         async function init() {
             try {
                 // WebAssemblyモジュールを読み込む
-                const wasmModule = await import('./pkg/ecs_wasm_game.js');
+                const wasmModule = await import('./pkg/ecs_wasm_game4.js');
                 await wasmModule.default();
 
                 // ゲームを初期化
-                wasmModule.init_game();
+                const game = wasmModule.create_game('game-container');
 
                 // ボタンにイベントリスナーを追加
                 document.getElementById('new-game').addEventListener('click', () => {
