@@ -12,7 +12,6 @@ mod constants;
 mod components;
 mod resources;
 
-use crate::ecs::world::World;
 use crate::game::Game;
 
 /// ゲーム初期化関数

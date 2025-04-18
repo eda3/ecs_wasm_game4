@@ -344,9 +344,11 @@ impl CardRenderer {
 }
 
 /// テキストの幅を測定
-fn measure_text(ctx: &CanvasRenderingContext2d, text: &str) -> Result<SimpleTextMetrics, JsValue> {
-    // Web APIのTextMetricsが使えないため、おおよその幅を計算
-    // 実際のフォントによって異なるが、簡易的な近似値
-    let approx_width = text.len() as f64 * 12.0;
-    Ok(SimpleTextMetrics::new(approx_width))
+fn measure_text(_ctx: &CanvasRenderingContext2d, text: &str) -> Result<SimpleTextMetrics, JsValue> {
+    // テキスト幅の簡易測定
+    // 実際のテキスト幅をブラウザ側で計測する方法は複雑なので、
+    // 単純な推定値を返す（文字数 × 平均文字幅）
+    let estimated_width = text.len() as f64 * 8.0;  // 平均的な文字幅の推定値
+    
+    Ok(SimpleTextMetrics::new(estimated_width))
 } 

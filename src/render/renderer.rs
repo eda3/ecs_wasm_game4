@@ -26,7 +26,7 @@ impl Renderer {
     }
     
     /// ゲーム世界を描画
-    pub fn render(&self, world: &World, resources: &ResourceManager) -> Result<(), JsValue> {
+    pub fn render(&self, world: &World, _resources: &ResourceManager) -> Result<(), JsValue> {
         // キャンバスをクリア
         self.clear_canvas()?;
         

@@ -1,6 +1,6 @@
 use wasm_bindgen::JsValue;
 use wasm_bindgen::JsCast;
-use web_sys::HtmlCanvasElement;
+use web_sys::CanvasRenderingContext2d;
 
 /// レンダリングコンテキスト
 /// キャンバス要素とその2Dレンダリングコンテキストを管理します

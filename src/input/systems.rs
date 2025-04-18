@@ -6,8 +6,8 @@ use crate::ecs::component::{Transform, Draggable, Clickable, StackContainer, Sta
 use crate::ecs::entity::EntityId;
 use crate::input::input_handler::InputHandler;
 use crate::utils::Vec2;
-use crate::constants::{DRAG_THRESHOLD, DRAG_OPACITY};
-use log::{debug, error};
+use crate::constants::{DRAG_OPACITY};
+use log::debug;
 
 /// 入力処理システム
 /// マウスやキーボードの入力を処理し、ゲーム状態を更新する
@@ -126,7 +126,7 @@ impl System for InputSystem {
     ) -> Result<(), JsValue> {
         // 入力状態を取得
         let input_state = match _resources.get::<InputState>() {
-            Some(state) => state.clone(),  // クローンして所有権の問題を回避
+            Some(state) => state,  // 参照を使用
             None => return Ok(()),  // 入力状態がなければ何もしない
         };
         
@@ -231,12 +231,68 @@ impl DragSystem {
             renderable.opacity = DRAG_OPACITY;
         }
         
-        // 5. ドラッグ中のエンティティを記録
+        // 5. カードがタブローのスタックにある場合、そのカード以降のカードも一緒にドラッグ
+        let mut cards_to_drag = Vec::new();
+        
+        // カードがどのスタックに属しているか確認
+        let stacks = world.get_entities_with_component::<crate::ecs::component::StackContainer>();
+        for &stack_id in &stacks {
+            if let Some(stack) = world.get_component::<crate::ecs::component::StackContainer>(stack_id) {
+                // カードがこのスタックに含まれているか確認
+                if let Some(card_index) = stack.cards.iter().position(|&card| card == entity_id) {
+                    // タブローのスタックのみ、カード以降も一緒にドラッグ
+                    if let crate::ecs::component::StackType::Tableau { .. } = stack.stack_type {
+                        // 選択したカード以降のカードを追加
+                        cards_to_drag = stack.cards_from_index(card_index);
+                        
+                        // カードがタブロー内にあり、複数カードをドラッグする場合
+                        if cards_to_drag.len() > 1 {
+                            // 一番上のカード以外の不透明度も下げる
+                            for (i, &card_id) in cards_to_drag.iter().enumerate().skip(1) {
+                                if let Some(card_renderable) = world.get_component_mut::<crate::ecs::component::Renderable>(card_id) {
+                                    card_renderable.opacity = DRAG_OPACITY;
+                                }
+                                
+                                // カードの位置を調整（重ねて表示）
+                                // 1. 必要なデータを先に取得
+                                let position;
+                                let z_index;
+                                {
+                                    if let Some(card_transform) = world.get_component::<crate::ecs::component::Transform>(card_id) {
+                                        position = card_transform.position.clone();
+                                        z_index = card_transform.z_index;
+                                    } else {
+                                        continue;
+                                    }
+                                }
+                                
+                                // 2. Draggableコンポーネントを更新
+                                if let Some(card_draggable) = world.get_component_mut::<Draggable>(card_id) {
+                                    card_draggable.original_position = position;
+                                    card_draggable.original_z_index = z_index;
+                                    // 実際にドラッグされてるようにフラグを設定
+                                    card_draggable.is_dragging = true;
+                                }
+                                
+                                // 3. 別のスコープでTransformコンポーネントを再度取得して更新
+                                if let Some(card_transform) = world.get_component_mut::<crate::ecs::component::Transform>(card_id) {
+                                    // Z-indexを調整して重なる順序を維持
+                                    card_transform.z_index = 1000 + i as i32;
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+        
+        // 6. ドラッグ中のエンティティを記録
         self.dragged_entity = Some(entity_id);
         self.drag_start_position = mouse_position;
         self.drag_started = true;
         
-        debug!("🖱️ エンティティ {} のドラッグを開始", entity_id);
+        debug!("🖱️ エンティティ {} のドラッグを開始（一緒にドラッグするカード: {}枚）", entity_id, cards_to_drag.len());
         
         Ok(())
     }
@@ -259,18 +315,33 @@ impl DragSystem {
             transform.z_index = 1000;
         }
         
-        // ドラッグ中の子要素も一緒に移動
-        let drag_children = if let Some(draggable) = world.get_component::<Draggable>(entity_id) {
-            draggable.drag_children
-        } else {
-            false
-        };
+        // スタック内の追加カードも移動
+        let mut cards_to_update = Vec::new();
         
-        if drag_children {
-            // スタックコンテナを持つ場合、カードを一緒に移動
-            if let Some(_stack) = world.get_component::<StackContainer>(entity_id) {
-                // スタック内のカードも移動
-                // 実際の実装はもっと複雑になるが、ここではシンプルに
+        // カードがどのスタックに属しているか確認
+        let stacks = world.get_entities_with_component::<crate::ecs::component::StackContainer>();
+        for &stack_id in &stacks {
+            if let Some(stack) = world.get_component::<crate::ecs::component::StackContainer>(stack_id) {
+                // カードがこのスタックに含まれているか確認
+                if let Some(card_index) = stack.cards.iter().position(|&card| card == entity_id) {
+                    // タブローのスタックのみ、カード以降も一緒にドラッグ
+                    if let crate::ecs::component::StackType::Tableau { .. } = stack.stack_type {
+                        cards_to_update = stack.cards_from_index(card_index + 1);
+                    }
+                    break;
+                }
+            }
+        }
+        
+        // 追加カードの位置も更新
+        let base_x = mouse_position.x - drag_offset.x;
+        let base_y = mouse_position.y - drag_offset.y;
+        
+        for (i, &card_id) in cards_to_update.iter().enumerate() {
+            if let Some(transform) = world.get_component_mut::<Transform>(card_id) {
+                transform.position.x = base_x;
+                transform.position.y = base_y + (i as f64 + 1.0) * crate::constants::STACK_OFFSET_Y;
+                transform.z_index = 1000 + (i as i32 + 1);
             }
         }
         
@@ -304,62 +375,27 @@ impl DragSystem {
                 };
             }
             
+            // ドラッグしているカードと一緒にドラッグしている他のカードを取得
+            let dragged_cards = self.get_dragged_cards(world, entity_id)?;
+            
             // ドロップターゲットが有効なら
             if let Some(target_id) = drop_target {
                 if valid_drop {
                     // ドラッグを処理する
-                    self.process_drop(world, entity_id, target_id)?;
+                    if dragged_cards.len() > 1 {
+                        // 複数カードのドロップを処理
+                        self.process_multi_card_drop(world, dragged_cards, target_id)?;
+                    } else {
+                        // 単一カードのドロップを処理
+                        self.process_drop(world, entity_id, target_id)?;
+                    }
                 } else {
                     // 無効なドロップの場合は元の位置に戻す
-                    // 先に必要なデータを取得
-                    let original_position;
-                    let original_z_index;
-                    
-                    {
-                        // Draggableから元の位置情報を取得
-                        if let Some(draggable) = world.get_component::<Draggable>(entity_id) {
-                            original_position = draggable.original_position;
-                            original_z_index = draggable.original_z_index;
-                        } else {
-                            // データがなければ処理を終了
-                            self.dragged_entity = None;
-                            return Ok(());
-                        }
-                    }
-                    
-                    // 別のスコープでTransformを更新
-                    {
-                        if let Some(transform) = world.get_component_mut::<Transform>(entity_id) {
-                            transform.position = original_position;
-                            transform.z_index = original_z_index;
-                        }
-                    }
+                    self.reset_card_positions(world, &dragged_cards)?;
                 }
             } else {
                 // ドロップターゲットがない場合は元の位置に戻す
-                // 先に必要なデータを取得
-                let original_position;
-                let original_z_index;
-                
-                {
-                    // Draggableから元の位置情報を取得
-                    if let Some(draggable) = world.get_component::<Draggable>(entity_id) {
-                        original_position = draggable.original_position;
-                        original_z_index = draggable.original_z_index;
-                    } else {
-                        // データがなければ処理を終了
-                        self.dragged_entity = None;
-                        return Ok(());
-                    }
-                }
-                
-                // 別のスコープでTransformを更新
-                {
-                    if let Some(transform) = world.get_component_mut::<Transform>(entity_id) {
-                        transform.position = original_position;
-                        transform.z_index = original_z_index;
-                    }
-                }
+                self.reset_card_positions(world, &dragged_cards)?;
             }
             
             // ドラッグ状態をリセット
@@ -424,50 +460,318 @@ impl DragSystem {
     fn process_drop(&mut self, world: &mut World, dragged_entity: EntityId, drop_target: EntityId) -> Result<(), JsValue> {
         debug!("🎯 エンティティ {} をエンティティ {} の上にドロップ", dragged_entity, drop_target);
         
-        // ドロップ対象エンティティの情報を先に取得
-        let drop_position;
-        let original_position;
-        let original_z_index;
+        // 必要な情報を先に取得
+        let mut should_move_card = false;
+        let _target_stack: Option<crate::ecs::component::StackContainer> = None;
+        let _card_info: Option<crate::ecs::component::CardInfo> = None;
+        let _source_stack: Option<EntityId> = None;
         
-        {
-            // ドロップ先の位置を取得
-            if let Some(target_transform) = world.get_component::<Transform>(drop_target) {
-                drop_position = target_transform.position.clone();
-            } else {
-                drop_position = Vec2::zero();
+        // カード情報を取得
+        let card_info = if let Some(info) = world.get_component::<crate::ecs::component::CardInfo>(dragged_entity) {
+            Some(info.clone())
+        } else {
+            None
+        };
+        
+        // ドロップ先がスタックコンテナかチェック
+        let target_stack_container = if let Some(stack) = world.get_component::<crate::ecs::component::StackContainer>(drop_target) {
+            Some(stack.clone())
+        } else {
+            None
+        };
+        
+        // ドラッグしてるカードがどのスタックから来たかを調べる
+        let source_stack_id = {
+            let mut found_stack = None;
+            let stacks = world.get_entities_with_component::<crate::ecs::component::StackContainer>();
+            
+            for &stack_id in &stacks {
+                if let Some(stack) = world.get_component::<crate::ecs::component::StackContainer>(stack_id) {
+                    if stack.cards.contains(&dragged_entity) {
+                        found_stack = Some(stack_id);
+                        break;
+                    }
+                }
             }
             
-            // ドラッグしたエンティティの元の位置を取得
-            if let Some(draggable) = world.get_component::<Draggable>(dragged_entity) {
-                original_position = draggable.original_position;
-                original_z_index = draggable.original_z_index;
-            } else {
-                original_position = Vec2::zero();
-                original_z_index = 0;
+            found_stack
+        };
+        
+        // ドロップが有効かチェック（ソリティアのルールに基づく）
+        if let (Some(card_info), Some(target_stack)) = (card_info, target_stack_container) {
+            match target_stack.stack_type {
+                crate::ecs::component::StackType::Foundation { suit } => {
+                    // 組み札のルール: 同じスートで昇順（A, 2, 3, ...）
+                    if card_info.suit as usize == suit {
+                        let top_card = target_stack.top_card();
+                        if let Some(top_id) = top_card {
+                            if let Some(top_info) = world.get_component::<crate::ecs::component::CardInfo>(top_id) {
+                                // 次のランクなら配置可能
+                                should_move_card = card_info.rank == top_info.rank + 1;
+                            }
+                        } else {
+                            // 空のファウンデーションにはAのみ置ける
+                            should_move_card = card_info.rank == 0; // A
+                        }
+                    }
+                },
+                crate::ecs::component::StackType::Tableau { .. } => {
+                    // 場札のルール: 異なる色で降順（K, Q, J, ...）
+                    let top_card = target_stack.top_card();
+                    if let Some(top_id) = top_card {
+                        if let Some(top_info) = world.get_component::<crate::ecs::component::CardInfo>(top_id) {
+                            // 色が異なり、降順なら配置可能
+                            let is_diff_color = card_info.is_red() != top_info.is_red();
+                            should_move_card = is_diff_color && card_info.rank + 1 == top_info.rank;
+                        }
+                    } else {
+                        // 空の場札にはKのみ置ける
+                        should_move_card = card_info.rank == 12; // K
+                    }
+                },
+                _ => {} // その他のスタックは特別ルールなし
             }
         }
         
-        // ドラッグしたエンティティの状態を更新
-        if let Some(draggable) = world.get_component_mut::<Draggable>(dragged_entity) {
+        // カードを移動（ドロップが有効な場合）
+        if should_move_card {
+            // 元のスタックからカードを取り除く
+            if let Some(source_id) = source_stack_id {
+                if let Some(source_stack) = world.get_component_mut::<crate::ecs::component::StackContainer>(source_id) {
+                    source_stack.remove_card(dragged_entity);
+                }
+            }
+            
+            // 新しいスタックにカードを追加
+            if let Some(target_stack) = world.get_component_mut::<crate::ecs::component::StackContainer>(drop_target) {
+                target_stack.add_card(dragged_entity);
+                
+                // 1. 先に必要なデータを取得
+                let drop_position;
+                let cards_count;
+                {
+                    // スタックの現在のカード数を保存
+                    cards_count = target_stack.cards.len();
+                    
+                    // ここでtarget_stackのスコープ終了
+                }
+                
+                // 2. ドロップ先のTransformコンポーネントから位置情報を取得
+                {
+                    if let Some(target_transform) = world.get_component::<crate::ecs::component::Transform>(drop_target) {
+                        drop_position = target_transform.position.clone();
+                    } else {
+                        drop_position = Vec2::zero();
+                    }
+                }
+                
+                // 3. スタックのカード数に基づいて位置を計算
+                let offset_y = cards_count as f64 * crate::constants::STACK_OFFSET_Y;
+                
+                // 4. ドラッグしたカードのTransformを更新
+                if let Some(transform) = world.get_component_mut::<crate::ecs::component::Transform>(dragged_entity) {
+                    transform.position = Vec2::new(
+                        drop_position.x,
+                        drop_position.y + offset_y
+                    );
+                    transform.z_index = cards_count as i32;
+                }
+            }
+        } else {
+            // ドロップが無効なら元の位置に戻す
+            if let Some(draggable) = world.get_component::<crate::ecs::component::Draggable>(dragged_entity) {
+                let original_position = draggable.original_position;
+                let original_z_index = draggable.original_z_index;
+                
+                if let Some(transform) = world.get_component_mut::<crate::ecs::component::Transform>(dragged_entity) {
+                    transform.position = original_position;
+                    transform.z_index = original_z_index;
+                }
+            }
+        }
+        
+        // ドラッグ状態をリセット
+        if let Some(draggable) = world.get_component_mut::<crate::ecs::component::Draggable>(dragged_entity) {
             draggable.is_dragging = false;
+        }
+        
+        // レンダラブルコンポーネントの不透明度を元に戻す
+        if let Some(renderable) = world.get_component_mut::<crate::ecs::component::Renderable>(dragged_entity) {
+            renderable.opacity = 1.0;
+        }
+        
+        Ok(())
+    }
+    
+    /// 複数カードのドロップを処理
+    fn process_multi_card_drop(
+        &mut self, 
+        world: &mut World, 
+        dragged_cards: Vec<EntityId>, 
+        target_id: EntityId
+    ) -> Result<(), JsValue> {
+        debug!("🎯 複数のカード（{}枚）をエンティティ {} の上にドロップ", dragged_cards.len(), target_id);
+        
+        if dragged_cards.is_empty() {
+            return Ok(());
+        }
+        
+        // メインカード（最初にドラッグしたカード）
+        let main_card_id = dragged_cards[0];
+        
+        // カード情報を取得
+        let card_info = if let Some(info) = world.get_component::<crate::ecs::component::CardInfo>(main_card_id) {
+            Some(info.clone())
+        } else {
+            None
+        };
+        
+        // ドロップ先がスタックコンテナかチェック
+        let target_stack_container = if let Some(stack) = world.get_component::<crate::ecs::component::StackContainer>(target_id) {
+            Some(stack.clone())
+        } else {
+            None
+        };
+        
+        // ドラッグしてるカードがどのスタックから来たかを調べる
+        let source_stack_id = {
+            let mut found_stack = None;
+            let stacks = world.get_entities_with_component::<crate::ecs::component::StackContainer>();
             
-            // ドロップ先に応じた処理
-            // ここで具体的なゲームロジックを実装
-            // 例: カードをデッキに追加、アイテムをインベントリに配置など
+            for &stack_id in &stacks {
+                if let Some(stack) = world.get_component::<crate::ecs::component::StackContainer>(stack_id) {
+                    if stack.cards.contains(&main_card_id) {
+                        found_stack = Some(stack_id);
+                        break;
+                    }
+                }
+            }
             
-            // 現在は単純に位置を更新するだけの例
-            if let Some(transform) = world.get_component_mut::<Transform>(dragged_entity) {
-                // ドロップ先の上に配置（例としてオフセットを追加）
-                transform.position = Vec2::new(
-                    drop_position.x + 10.0,
-                    drop_position.y + 10.0
-                );
-                transform.z_index = original_z_index;
+            found_stack
+        };
+        
+        // ドロップが有効かチェック（ソリティアのルールに基づく）
+        let mut should_move_cards = false;
+        if let (Some(card_info), Some(target_stack)) = (card_info, target_stack_container) {
+            // タブローへのドロップのみ許可
+            if let crate::ecs::component::StackType::Tableau { .. } = target_stack.stack_type {
+                let top_card = target_stack.top_card();
+                if let Some(top_id) = top_card {
+                    if let Some(top_info) = world.get_component::<crate::ecs::component::CardInfo>(top_id) {
+                        // 色が異なり、降順なら配置可能
+                        let is_diff_color = card_info.is_red() != top_info.is_red();
+                        should_move_cards = is_diff_color && card_info.rank + 1 == top_info.rank;
+                    }
+                } else {
+                    // 空の場札にはKのみ置ける
+                    should_move_cards = card_info.rank == 12; // K
+                }
             }
         }
         
-        // ドロップイベントを発火させる
-        // ここでゲーム内のイベントシステムを使ってドロップイベントを通知できる
+        // カードを移動（ドロップが有効な場合）
+        if should_move_cards {
+            // 元のスタックからカードを取り除く
+            if let Some(source_id) = source_stack_id {
+                if let Some(source_stack) = world.get_component_mut::<crate::ecs::component::StackContainer>(source_id) {
+                    // カードの位置を調べる
+                    if let Some(card_index) = source_stack.cards.iter().position(|&card| card == main_card_id) {
+                        // 該当位置以降のカードをすべて削除
+                        let _removed_cards = source_stack.remove_cards_from_index(card_index);
+                    }
+                }
+            }
+            
+            // 新しいスタックにカードを追加
+            if let Some(target_stack) = world.get_component_mut::<crate::ecs::component::StackContainer>(target_id) {
+                let start_pos = target_stack.cards.len();
+                
+                // 各カードを追加
+                for &card_id in &dragged_cards {
+                    target_stack.add_card(card_id);
+                }
+                
+                // カードの位置を新しいスタックに合わせて更新
+                if let Some(target_transform) = world.get_component::<crate::ecs::component::Transform>(target_id) {
+                    let base_position = target_transform.position.clone();
+                    
+                    for (i, &card_id) in dragged_cards.iter().enumerate() {
+                        let card_index = start_pos + i;
+                        let offset_y = card_index as f64 * crate::constants::STACK_OFFSET_Y;
+                        
+                        if let Some(transform) = world.get_component_mut::<crate::ecs::component::Transform>(card_id) {
+                            transform.position = Vec2::new(
+                                base_position.x,
+                                base_position.y + offset_y
+                            );
+                            transform.z_index = card_index as i32;
+                        }
+                        
+                        // ドラッグ状態をリセット
+                        if let Some(draggable) = world.get_component_mut::<crate::ecs::component::Draggable>(card_id) {
+                            draggable.is_dragging = false;
+                        }
+                        
+                        // 不透明度を元に戻す
+                        if let Some(renderable) = world.get_component_mut::<crate::ecs::component::Renderable>(card_id) {
+                            renderable.opacity = 1.0;
+                        }
+                    }
+                }
+            }
+        } else {
+            // ドロップが無効なら元の位置に戻す
+            self.reset_card_positions(world, &dragged_cards)?;
+        }
+        
+        Ok(())
+    }
+    
+    /// ドラッグしているすべてのカードを取得
+    fn get_dragged_cards(&self, world: &World, main_card_id: EntityId) -> Result<Vec<EntityId>, JsValue> {
+        let mut dragged_cards = vec![main_card_id];
+        
+        // カードがどのスタックに属しているか確認
+        let stacks = world.get_entities_with_component::<crate::ecs::component::StackContainer>();
+        for &stack_id in &stacks {
+            if let Some(stack) = world.get_component::<crate::ecs::component::StackContainer>(stack_id) {
+                // カードがこのスタックに含まれているか確認
+                if let Some(card_index) = stack.cards.iter().position(|&card| card == main_card_id) {
+                    // タブローのスタックのみ、カード以降も一緒にドラッグ
+                    if let crate::ecs::component::StackType::Tableau { .. } = stack.stack_type {
+                        dragged_cards = stack.cards_from_index(card_index);
+                    }
+                    break;
+                }
+            }
+        }
+        
+        Ok(dragged_cards)
+    }
+    
+    /// カードの位置を元に戻す
+    fn reset_card_positions(&self, world: &mut World, cards: &[EntityId]) -> Result<(), JsValue> {
+        for &card_id in cards {
+            if let Some(draggable) = world.get_component::<crate::ecs::component::Draggable>(card_id) {
+                let original_position = draggable.original_position;
+                let original_z_index = draggable.original_z_index;
+                
+                if let Some(transform) = world.get_component_mut::<crate::ecs::component::Transform>(card_id) {
+                    transform.position = original_position;
+                    transform.z_index = original_z_index;
+                }
+                
+                // ドラッグ状態をリセット
+                if let Some(draggable) = world.get_component_mut::<crate::ecs::component::Draggable>(card_id) {
+                    draggable.is_dragging = false;
+                }
+                
+                // 不透明度を元に戻す
+                if let Some(renderable) = world.get_component_mut::<crate::ecs::component::Renderable>(card_id) {
+                    renderable.opacity = 1.0;
+                }
+            }
+        }
         
         Ok(())
     }

@@ -1,11 +1,11 @@
 use wasm_bindgen::prelude::*;
-use web_sys::{HtmlCanvasElement, MouseEvent, KeyboardEvent, Event, EventTarget};
+use web_sys::{HtmlCanvasElement, MouseEvent, KeyboardEvent};
 use std::cell::RefCell;
 use std::rc::Rc;
 use crate::ecs::world::World;
 use crate::ecs::resources::{ResourceManager, InputState};
 use crate::utils::Vec2;
-use log::{info, debug, error};
+use log::{info, debug};
 
 /// 入力ハンドラー
 /// ユーザーの入力イベント（マウス、キーボード、タッチ）を処理する

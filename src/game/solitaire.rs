@@ -22,7 +22,7 @@ pub fn setup_solitaire_board(world: &mut World) -> Result<(), JsValue> {
     let stock_id = create_stock(world, deck.clone())?;
     
     // ウェイスト（捨て札）を作成
-    let waste_id = create_waste(world)?;
+    let _waste_id = create_waste(world)?;
     
     // タブロー（場札）を作成 - 7列
     let tableau_ids = create_tableau(world)?;
@@ -31,7 +31,7 @@ pub fn setup_solitaire_board(world: &mut World) -> Result<(), JsValue> {
     deal_cards_to_tableau(world, &mut deck, &tableau_ids)?;
     
     // ファウンデーション（組み札）を作成 - 4スート
-    let foundation_ids = create_foundations(world)?;
+    let _foundation_ids = create_foundations(world)?;
     
     // 残りのカードをストックに追加
     add_cards_to_stock(world, stock_id, &deck)?;
@@ -40,7 +40,7 @@ pub fn setup_solitaire_board(world: &mut World) -> Result<(), JsValue> {
 }
 
 /// ストック（山札）を作成
-fn create_stock(world: &mut World, cards: Vec<EntityId>) -> Result<EntityId, JsValue> {
+fn create_stock(world: &mut World, _cards: Vec<EntityId>) -> Result<EntityId, JsValue> {
     // ストックのエンティティを作成
     let stock_id = world.create_entity()?;
     
