@@ -71,6 +71,7 @@ impl InputHandler {
             if let Some(input_state) = resources.borrow_mut().get_mut::<InputState>() {
                 input_state.update_mouse_position(x, y);
                 input_state.update_mouse_button(0, true);  // 左ボタン
+                input_state.is_mouse_clicked = true;  // クリックフラグを設定
                 debug!("🖱️ マウスダウン: ({}, {})", x, y);
             }
         }) as Box<dyn FnMut(MouseEvent)>);

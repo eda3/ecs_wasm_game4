@@ -839,7 +839,15 @@ impl System for DragSystem {
         resources: &mut ResourceManager,
         _delta_time: f32,
     ) -> Result<(), JsValue> {
-        self.update(world, resources)
+        // 結果を取得
+        let result = self.update(world, resources);
+        
+        // フレームの最後にクリックフラグをリセット
+        if let Some(input_state) = resources.get_mut::<InputState>() {
+            input_state.is_mouse_clicked = false;
+        }
+        
+        result
     }
 }
 
