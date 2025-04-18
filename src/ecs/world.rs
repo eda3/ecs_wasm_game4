@@ -3,6 +3,9 @@ use crate::ecs::entity::{EntityId, EntityManager};
 use crate::ecs::component::{Component, ComponentManager};
 use crate::ecs::system::{System, SystemManager};
 use crate::ecs::resources::ResourceManager;
+use crate::ecs::component::{Transform, Renderable, Clickable};
+use crate::utils::Vec2;
+use log::error;
 
 /// World構造体
 /// エンティティ、コンポーネント、システム、リソースを統合管理する
@@ -152,5 +155,45 @@ impl World {
         self.entity_manager.clear_all_entities();
         self.component_manager.clear();
         self.created_entities.clear();
+    }
+    
+    /// 指定した座標にあるエンティティを取得
+    /// Z-indexの大きい（上に表示されている）エンティティを優先的に返す
+    pub fn get_entity_at_position(&self, x: f64, y: f64) -> Option<EntityId> {
+        let position = Vec2::new(x, y);
+        
+        // Z-indexでソートするためにエンティティを一時配列に格納
+        let mut clickable_entities = Vec::new();
+        
+        // クリック可能なエンティティを収集
+        for entity_id in self.get_all_entities().iter() {
+            // このエンティティがTransformとRenderableを持っているか確認
+            if let (Some(transform), Some(renderable)) = (
+                self.get_component::<Transform>(*entity_id),
+                self.get_component::<Renderable>(*entity_id)
+            ) {
+                // 表示されていないエンティティは対象外
+                if !renderable.visible {
+                    continue;
+                }
+                
+                // エンティティの矩形内にクリック位置があるか確認
+                let left = transform.position.x;
+                let top = transform.position.y;
+                let right = left + renderable.width;
+                let bottom = top + renderable.height;
+                
+                if position.x >= left && position.x <= right && position.y >= top && position.y <= bottom {
+                    // クリック可能なエンティティをZ-indexと共に保存
+                    clickable_entities.push((*entity_id, transform.z_index));
+                }
+            }
+        }
+        
+        // Z-indexでソート（降順）
+        clickable_entities.sort_by(|a, b| b.1.cmp(&a.1));
+        
+        // 最も上にあるエンティティを返す
+        clickable_entities.first().map(|(entity_id, _)| *entity_id)
     }
 } 
