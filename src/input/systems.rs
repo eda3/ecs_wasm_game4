@@ -197,9 +197,6 @@ impl DragSystem {
     
     /// ドラッグを開始
     fn start_drag(&mut self, world: &mut World, entity_id: EntityId, mouse_position: Vec2) -> Result<(), JsValue> {
-        debug!("🔄 start_drag呼び出し: エンティティ={}, マウス位置=({:.1f}, {:.1f})", 
-               entity_id, mouse_position.x, mouse_position.y);
-                
         // 必要な情報を先に取得
         let transform_position;
         let transform_z_index;
@@ -209,11 +206,8 @@ impl DragSystem {
             if let Some(transform) = world.get_component::<Transform>(entity_id) {
                 transform_position = transform.position;
                 transform_z_index = transform.z_index;
-                debug!("✅ Transformコンポーネント取得: 位置=({:.1f}, {:.1f}), z_index={}", 
-                       transform_position.x, transform_position.y, transform_z_index);
             } else {
                 // Transformがなければ処理を中止
-                debug!("❌ エンティティ {} にTransformコンポーネントがありません", entity_id);
                 return Ok(());
             }
         }
@@ -224,87 +218,45 @@ impl DragSystem {
             mouse_position.y - transform_position.y,
         );
         
-        debug!("📊 ドラッグ開始: エンティティ={}, 位置=({:.1f}, {:.1f}), マウス=({:.1f}, {:.1f}), オフセット=({:.1f}, {:.1f})",
-               entity_id, transform_position.x, transform_position.y,
-               mouse_position.x, mouse_position.y, drag_offset.x, drag_offset.y);
-        
-        // 3. Draggableコンポーネントの存在を確認
-        let has_draggable = world.has_component::<Draggable>(entity_id);
-        debug!("🔍 エンティティ {} のDraggableコンポーネント: {}", entity_id, has_draggable);
-        
-        // 4. ドラッグ可能コンポーネントを更新
+        // 3. ドラッグ可能コンポーネントを更新
         if let Some(draggable) = world.get_component_mut::<Draggable>(entity_id) {
-            debug!("✅ Draggableコンポーネント更新: サイズ=({:.1f}x{:.1f})", draggable.width, draggable.height);
             draggable.is_dragging = true;
             draggable.original_position = transform_position;
             draggable.original_z_index = transform_z_index;
             draggable.drag_offset = drag_offset;
-        } else {
-            debug!("❌ エンティティ {} にDraggableコンポーネントがありません", entity_id);
         }
         
-        // 5. レンダラブルコンポーネントの不透明度を下げる
+        // 4. レンダラブルコンポーネントの不透明度を下げる
         if let Some(renderable) = world.get_component_mut::<crate::ecs::component::Renderable>(entity_id) {
             renderable.opacity = DRAG_OPACITY;
-            debug!("✅ Renderableコンポーネント更新: 不透明度={}", DRAG_OPACITY);
         }
         
-        // 6. ドラッグ中のエンティティを記録
+        // 5. ドラッグ中のエンティティを記録
         self.dragged_entity = Some(entity_id);
         self.drag_start_position = mouse_position;
         self.drag_started = true;
         
-        debug!("✅ エンティティ {} のドラッグを開始しました", entity_id);
+        debug!("🖱️ エンティティ {} のドラッグを開始", entity_id);
         
         Ok(())
     }
     
     /// ドラッグ中の更新
     fn update_drag(&mut self, world: &mut World, entity_id: EntityId, mouse_position: Vec2) -> Result<(), JsValue> {
-        debug!("🔄 update_drag呼び出し: エンティティ={}, マウス位置=({:.1f}, {:.1f})", 
-               entity_id, mouse_position.x, mouse_position.y);
-               
-        // Draggableコンポーネントの存在を確認
-        let has_draggable = world.has_component::<Draggable>(entity_id);
-        debug!("🔍 エンティティ {} のDraggableコンポーネント: {}", entity_id, has_draggable);
-        
         // ドラッグオフセットを取得
         let drag_offset = if let Some(draggable) = world.get_component::<Draggable>(entity_id) {
-            debug!("✅ Draggableコンポーネント取得: is_dragging={}, オフセット=({:.1f}, {:.1f})", 
-                   draggable.is_dragging, draggable.drag_offset.x, draggable.drag_offset.y);
             draggable.drag_offset
         } else {
-            debug!("❌ エンティティ {} にDraggableコンポーネントがありません", entity_id);
             Vec2::zero() // デフォルト値
         };
         
-        // 新しい位置を計算
-        let new_x = mouse_position.x - drag_offset.x;
-        let new_y = mouse_position.y - drag_offset.y;
-        
-        debug!("📊 ドラッグ更新: エンティティ={}, マウス=({:.1f}, {:.1f}), オフセット=({:.1f}, {:.1f}), 新位置=({:.1f}, {:.1f})",
-               entity_id, mouse_position.x, mouse_position.y, 
-               drag_offset.x, drag_offset.y, new_x, new_y);
-        
-        // Transformコンポーネントの存在を確認
-        let has_transform = world.has_component::<Transform>(entity_id);
-        debug!("🔍 エンティティ {} のTransformコンポーネント: {}", entity_id, has_transform);
-        
         // エンティティの位置を更新
         if let Some(transform) = world.get_component_mut::<Transform>(entity_id) {
-            debug!("✅ 位置更新前: ({:.1f}, {:.1f}), z_index={}", 
-                   transform.position.x, transform.position.y, transform.z_index);
-                   
-            transform.position.x = new_x;
-            transform.position.y = new_y;
+            transform.position.x = mouse_position.x - drag_offset.x;
+            transform.position.y = mouse_position.y - drag_offset.y;
             
             // Z-indexを大きくして最前面に表示
             transform.z_index = 1000;
-            
-            debug!("✅ 位置更新後: ({:.1f}, {:.1f}), z_index={}", 
-                   transform.position.x, transform.position.y, transform.z_index);
-        } else {
-            debug!("❌ エンティティ {} にTransformコンポーネントがありません", entity_id);
         }
         
         // ドラッグ中の子要素も一緒に移動
@@ -315,7 +267,6 @@ impl DragSystem {
         };
         
         if drag_children {
-            debug!("ℹ️ 子要素も一緒に移動します");
             // スタックコンテナを持つ場合、カードを一緒に移動
             if let Some(_stack) = world.get_component::<StackContainer>(entity_id) {
                 // スタック内のカードも移動
@@ -329,8 +280,6 @@ impl DragSystem {
     /// ドラッグを終了
     fn end_drag(&mut self, world: &mut World) -> Result<(), JsValue> {
         if let Some(entity_id) = self.dragged_entity {
-            debug!("ドラッグ終了: エンティティ={}", entity_id);
-            
             // 現在の位置とドロップターゲットの情報を先に取得
             let current_position;
             let drop_target;
@@ -353,9 +302,6 @@ impl DragSystem {
                 } else {
                     false
                 };
-                
-                debug!("ドロップ情報: 現在位置=({}, {}), ターゲット={:?}, 有効={}",
-                       current_position.x, current_position.y, drop_target, valid_drop);
             }
             
             // ドロップターゲットが有効なら
@@ -599,53 +545,32 @@ impl DragSystem {
         
         // input_stateがNoneの場合は早期リターン
         if input_state.is_none() {
-            debug!("❌ DragSystem: InputStateが見つかりません");
             return Ok(());
         }
         
         let input_state = input_state.unwrap();
-        debug!("🔄 DragSystem更新: is_mouse_clicked={}, is_mouse_down={}, pos=({:.1f}, {:.1f}), ドラッグ中エンティティ={:?}", 
-               input_state.is_mouse_clicked, input_state.is_mouse_down, 
-               input_state.mouse_position.x, input_state.mouse_position.y,
-               self.dragged_entity);
         
         // マウスイベントを処理
         // クリックされたエンティティを見つける
-        let clicked_entity = if input_state.is_mouse_clicked || input_state.is_mouse_down {
-            debug!("🔍 マウスクリック/ドラッグ検出！エンティティを検索中...");
-            let entity = self.find_clicked_entity(world, input_state.mouse_position)?;
-            if let Some(id) = entity {
-                debug!("✅ エンティティ {} が見つかりました", id);
-            } else {
-                debug!("❌ クリック位置にエンティティが見つかりません");
-            }
-            entity
+        let clicked_entity = if input_state.is_mouse_clicked {
+            self.find_clicked_entity(world, input_state.mouse_position)?
         } else {
             None
         };
         
         // クリックされたエンティティがあれば処理
         if let Some(entity_id) = clicked_entity {
-            debug!("👆 ドラッグ可能なエンティティをクリック: {}", entity_id);
-            if self.dragged_entity.is_none() { // まだドラッグ中でなければ処理
-                debug!("🔄 エンティティ {} のドラッグを開始します", entity_id);
-                self.handle_entity_click(world, entity_id, input_state.mouse_position)?;
-            } else {
-                debug!("ℹ️ 既にドラッグ中のため、新たなクリックを無視します");
-            }
+            self.handle_entity_click(world, entity_id, input_state.mouse_position)?;
         }
         
         // ドラッグ処理
         if let Some(entity_id) = self.dragged_entity {
             if input_state.is_mouse_down {
                 // ドラッグ中の更新
-                debug!("🔄 エンティティ {} をドラッグ中... マウス位置=({:.1f}, {:.1f})", 
-                       entity_id, input_state.mouse_position.x, input_state.mouse_position.y);
                 self.update_drag(world, entity_id, input_state.mouse_position)?;
             }
             // マウスボタンが離された瞬間
             else if !input_state.is_mouse_down {
-                debug!("👆 マウスが離されました。ドラッグを終了します");
                 self.end_drag(world)?;
             }
         }

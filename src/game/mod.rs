@@ -20,7 +20,6 @@ use crate::ecs::resources::ResourceManager;
 use crate::render::renderer::Renderer;
 use crate::input::input_handler::InputHandler;
 use crate::game::setup::setup_game;
-use crate::utils::Vec2;
 use log::{info, error};
 
 // ゲームのメインループを処理するクロージャの型
@@ -136,8 +135,9 @@ impl Game {
             &mut resource_manager.borrow_mut(),
         )?;
         
-        // ゲームオブジェクトを作成
-        let mut game = Game {
+        info!("✨ ゲームの初期化が完了しました！");
+        
+        Ok(Game {
             canvas,
             context,
             world,
@@ -147,14 +147,7 @@ impl Game {
             input_handler,
             _game_loop: None,
             is_running: false,
-        };
-        
-        // 入力ハンドラーを設定
-        game.setup_input_handlers()?;
-        
-        info!("✨ ゲームの初期化が完了しました！");
-        
-        Ok(game)
+        })
     }
     
     /// ゲームを開始
@@ -200,11 +193,6 @@ impl Game {
             // レンダリング
             if let Err(e) = renderer_clone.render(&world, &resource_manager) {
                 error!("レンダリング中にエラーが発生しました: {:?}", e);
-            }
-            
-            // クリック状態をリセット（フレームの最後に呼び出す）
-            if let Some(input_state) = resource_manager.get_mut::<crate::ecs::resources::InputState>() {
-                input_state.reset_click_state();
             }
             
             // 次のフレームをリクエスト
@@ -262,25 +250,6 @@ impl Game {
     pub fn setup_input_handlers(&self) -> Result<(), JsValue> {
         self.input_handler.register_event_handlers()
     }
-
-    /// クリックされたエンティティを処理する
-    pub fn handle_entity_click(&self, x: f64, y: f64) -> Option<usize> {
-        // クリック位置にあるエンティティを検索
-        let entity = self.world.borrow().get_entity_at_position(x, y);
-        
-        if let Some(entity_id) = entity {
-            info!("エンティティ {} がクリックされました", entity_id);
-            
-            // ここでエンティティに対するアクションを実行
-            // 例: カードをめくる、カードを移動する、など
-            
-            // 将来的にはこのクリックに対する具体的なゲームロジックを実装
-            
-            return Some(entity_id);
-        }
-        
-        None
-    }
 }
 
 // Dropトレイトを実装して、リソースの解放を行う
@@ -290,27 +259,5 @@ impl Drop for Game {
         self.stop();  // ゲームループを停止
         
         // ここで追加のクリーンアップが必要な場合は実装
-    }
-}
-
-// Clone実装を手動で追加
-impl Clone for Game {
-    fn clone(&self) -> Self {
-        // 注意: 完全なコピーではなく、Rc/RefCellの参照カウントを増やすだけ
-        Game {
-            canvas: self.canvas.clone(),
-            context: self.context.clone(),
-            world: Rc::clone(&self.world),
-            system_manager: Rc::clone(&self.system_manager),
-            resource_manager: Rc::clone(&self.resource_manager),
-            renderer: self.renderer.clone(),
-            input_handler: InputHandler::new(
-                self.canvas.clone(),
-                Rc::clone(&self.world),
-                Rc::clone(&self.resource_manager),
-            ).unwrap_or_else(|_| panic!("入力ハンドラーの作成に失敗しました")),
-            _game_loop: None, // クローン時にはゲームループは共有しない
-            is_running: self.is_running,
-        }
     }
 } 

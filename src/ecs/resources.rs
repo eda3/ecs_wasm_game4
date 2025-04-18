@@ -151,11 +151,6 @@ impl InputState {
             && self.mouse_position.y >= y
             && self.mouse_position.y <= y + height
     }
-    
-    /// クリック状態をリセット（毎フレーム呼び出される）
-    pub fn reset_click_state(&mut self) {
-        self.is_mouse_clicked = false;
-    }
 }
 
 /// 時間関連情報を管理するリソース

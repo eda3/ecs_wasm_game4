@@ -1,7 +1,5 @@
 use wasm_bindgen::prelude::*;
-use log::{info, error};
-use std::cell::RefCell;
-use std::rc::Rc;
+use log::info;
 
 // モジュール定義
 mod ecs;
@@ -16,12 +14,6 @@ mod resources;
 
 use crate::ecs::world::World;
 use crate::game::Game;
-use crate::utils::Vec2;
-
-// グローバルなゲームインスタンス
-thread_local! {
-    static GAME_INSTANCE: RefCell<Option<Game>> = RefCell::new(None);
-}
 
 /// ゲーム初期化関数
 /// Javascriptからこの関数を呼び出してゲームを開始する
@@ -51,11 +43,6 @@ pub fn create_game(canvas_id: &str) -> Result<Game, JsValue> {
     // ゲームを開始
     game.start()?;
     
-    // グローバルインスタンスを保存
-    GAME_INSTANCE.with(|instance| {
-        *instance.borrow_mut() = Some(game.clone());
-    });
-    
     Ok(game)
 }
 
@@ -63,13 +50,7 @@ pub fn create_game(canvas_id: &str) -> Result<Game, JsValue> {
 #[wasm_bindgen]
 pub fn new_game() {
     info!("new_game()が呼び出されました");
-    GAME_INSTANCE.with(|instance| {
-        if let Some(ref mut game) = *instance.borrow_mut() {
-            if let Err(e) = game.reset() {
-                error!("ゲームのリセット中にエラーが発生しました: {:?}", e);
-            }
-        }
-    });
+    // 将来的に新規ゲーム開始ロジックをここに追加
 }
 
 /// 操作を元に戻すJavaScript向け関数
@@ -90,16 +71,7 @@ pub fn update_game_state(state_json: &str) {
 #[wasm_bindgen]
 pub fn handle_click(x: f64, y: f64) {
     info!("handle_click({}, {})が呼び出されました", x, y);
-    
-    // グローバルなゲームインスタンスがあれば、クリックイベントを処理
-    GAME_INSTANCE.with(|instance| {
-        if let Some(ref game) = *instance.borrow() {
-            // ゲームにクリックイベントを処理させる
-            if let Some(entity_id) = game.handle_entity_click(x, y) {
-                info!("エンティティID {} がクリックされました", entity_id);
-            }
-        }
-    });
+    // 将来的にクリック処理ロジックをここに追加
 }
 
 /// テスト用Hello関数

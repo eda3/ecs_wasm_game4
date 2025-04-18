@@ -517,7 +517,7 @@ pub struct StackContainer {
 
 /// スタックタイプ
 /// カードの山の種類を指定
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum StackType {
     /// 山札
     Stock,
@@ -560,39 +560,9 @@ impl StackContainer {
         }
     }
     
-    /// スタックの一番上のカードを削除して返す
-    pub fn remove_top_card(&mut self) -> Option<EntityId> {
-        self.cards.pop()
-    }
-    
     /// スタックの一番上のカードID（最後の要素）を返す
     pub fn top_card(&self) -> Option<EntityId> {
         self.cards.last().copied()
-    }
-    
-    /// スタックの一番上のカードID（最後の要素）を返す（top_cardの別名）
-    pub fn get_top_card(&self) -> Option<EntityId> {
-        self.top_card()
-    }
-    
-    /// スタック内のすべてのカードのリストを返す
-    pub fn get_all_cards(&self) -> Vec<EntityId> {
-        self.cards.clone()
-    }
-    
-    /// スタック内のすべてのカードをクリア
-    pub fn clear_cards(&mut self) {
-        self.cards.clear();
-    }
-    
-    /// 指定したカードのインデックスを返す
-    pub fn get_card_index(&self, card_id: EntityId) -> Option<usize> {
-        self.cards.iter().position(|id| *id == card_id)
-    }
-    
-    /// スタックに指定したカードが含まれているかチェック
-    pub fn contains_card(&self, card_id: EntityId) -> bool {
-        self.cards.contains(&card_id)
     }
     
     /// スタックが空かどうか
