@@ -72,7 +72,8 @@ impl InputHandler {
                 input_state.update_mouse_position(x, y);
                 input_state.update_mouse_button(0, true);  // 左ボタン
                 input_state.is_mouse_clicked = true;  // クリックフラグを設定
-                debug!("🖱️ マウスダウン: ({}, {})", x, y);
+                input_state.is_mouse_down = true;     // マウスが押されている状態に設定
+                debug!("🖱️ マウスダウン検出: ({}, {}) - クリックフラグ設定", x, y);
             }
         }) as Box<dyn FnMut(MouseEvent)>);
         
@@ -91,6 +92,7 @@ impl InputHandler {
             if let Some(input_state) = resources_up.borrow_mut().get_mut::<InputState>() {
                 input_state.update_mouse_position(x, y);
                 input_state.update_mouse_button(0, false);  // 左ボタン
+                input_state.is_mouse_down = false;  // マウスが離された状態に設定
                 debug!("🖱️ マウスアップ: ({}, {})", x, y);
             }
         }) as Box<dyn FnMut(MouseEvent)>);
@@ -109,6 +111,11 @@ impl InputHandler {
             
             if let Some(input_state) = resources_move.borrow_mut().get_mut::<InputState>() {
                 input_state.update_mouse_position(x, y);
+                
+                // マウスボタンが押されている場合のみログを出力（頻度を抑える）
+                if input_state.is_mouse_down {
+                    debug!("🖱️ マウス移動中: ({}, {}), ドラッグ中: {}", x, y, input_state.is_mouse_down);
+                }
             }
         }) as Box<dyn FnMut(MouseEvent)>);
         

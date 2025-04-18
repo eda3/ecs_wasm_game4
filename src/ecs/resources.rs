@@ -114,6 +114,7 @@ impl InputState {
             
             if button == 0 {  // 左ボタン
                 self.is_mouse_down = pressed;
+                log::debug!("🖱️ マウスボタン状態更新: button={}, pressed={}, is_mouse_down={}", button, pressed, self.is_mouse_down);
                 if pressed {
                     self.mouse_down_position = self.mouse_position;
                 }
