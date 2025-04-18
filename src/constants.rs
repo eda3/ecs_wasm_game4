@@ -26,7 +26,7 @@ pub const CARD_HEIGHT: f64 = 120.0;
 pub const CARD_BORDER_RADIUS: f64 = 5.0;  // カード角の丸み
 
 // カードの間隔と配置
-pub const CARD_SPACING_X: f64 = 20.0;  // カード間の横方向の間隔
+pub const CARD_SPACING_X: f64 = 40.0;  // カード間の横方向の間隔
 pub const CARD_SPACING_Y: f64 = 30.0;  // カード間の縦方向の間隔
 pub const STACK_OFFSET_Y: f64 = 25.0;  // 重なったカードの表示オフセット
 
