@@ -33,7 +33,8 @@ pub fn create_card(
     
     // ドラッグ可能コンポーネントを追加（面が表の場合のみ）
     if face_up {
-        let draggable = Draggable::new();
+        let draggable = Draggable::new()
+            .with_size(CARD_WIDTH, CARD_HEIGHT);
         world.add_component(entity_id, draggable)?;
     }
     
@@ -54,7 +55,8 @@ pub fn flip_card(world: &mut World, card_id: EntityId) -> Result<(), JsValue> {
         // 表向きになった場合、ドラッグ可能にする
         if card_info.face_up {
             if !world.has_component::<Draggable>(card_id) {
-                world.add_component(card_id, Draggable::new())?;
+                world.add_component(card_id, Draggable::new()
+                    .with_size(CARD_WIDTH, CARD_HEIGHT))?;
             }
         } else {
             // 裏向きになった場合、ドラッグ不可にする（必要に応じて）
@@ -175,7 +177,8 @@ pub fn set_card_position(world: &mut World, card_id: EntityId, x: f64, y: f64, z
 pub fn set_card_draggable(world: &mut World, card_id: EntityId, draggable: bool) -> Result<(), JsValue> {
     if draggable {
         if !world.has_component::<Draggable>(card_id) {
-            world.add_component(card_id, Draggable::new())?;
+            world.add_component(card_id, Draggable::new()
+                .with_size(CARD_WIDTH, CARD_HEIGHT))?;
         }
     } else {
         world.remove_component::<Draggable>(card_id);

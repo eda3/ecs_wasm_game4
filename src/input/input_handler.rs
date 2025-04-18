@@ -67,11 +67,18 @@ impl InputHandler {
             let x = event.client_x() as f64 - rect.left();
             let y = event.client_y() as f64 - rect.top();
             
+            debug!("🔍 マウスダウンイベント検出: client_pos=({}, {}), canvas_pos=({}, {})",
+                   event.client_x(), event.client_y(), x, y);
+            
             // 入力状態を更新
             if let Some(input_state) = resources.borrow_mut().get_mut::<InputState>() {
                 input_state.update_mouse_position(x, y);
                 input_state.update_mouse_button(0, true);  // 左ボタン
-                debug!("🖱️ マウスダウン: ({}, {})", x, y);
+                input_state.is_mouse_clicked = true;  // クリックフラグを設定
+                debug!("🖱️ マウスダウン: ({}, {}), mouse_down={}, clicked={}", 
+                       x, y, input_state.is_mouse_down, input_state.is_mouse_clicked);
+            } else {
+                debug!("❌ InputStateが見つかりません");
             }
         }) as Box<dyn FnMut(MouseEvent)>);
         

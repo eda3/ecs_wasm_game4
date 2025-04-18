@@ -74,5 +74,30 @@ fn setup_world(world: &mut World) -> Result<(), JsValue> {
     // ソリティアボードをセットアップ
     solitaire::setup_solitaire_board(world)?;
     
+    // セットアップ後にカードが正しく設定されているかチェック
+    check_card_components(world);
+    
     Ok(())
+}
+
+/// カードコンポーネントが正しく設定されているかチェック
+fn check_card_components(world: &World) {
+    use crate::ecs::component::{Draggable, CardInfo};
+    
+    // ドラッグ可能なエンティティを取得
+    let draggable_entities = world.get_entities_with_component::<Draggable>();
+    info!("ドラッグ可能なエンティティ数: {}", draggable_entities.len());
+    
+    // カード情報を持つエンティティを取得
+    let card_entities = world.get_entities_with_component::<CardInfo>();
+    info!("カードエンティティ数: {}", card_entities.len());
+    
+    // 表向きのカードが正しくドラッグ可能になっているか確認
+    for &entity_id in &card_entities {
+        if let Some(card_info) = world.get_component::<CardInfo>(entity_id) {
+            let has_draggable = world.has_component::<Draggable>(entity_id);
+            info!("カードID: {}, スート: {}, ランク: {}, 表向き: {}, ドラッグ可能: {}", 
+                  entity_id, card_info.suit, card_info.rank, card_info.face_up, has_draggable);
+        }
+    }
 } 

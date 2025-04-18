@@ -179,6 +179,15 @@ fn deal_cards_to_tableau(
             // 最後のカードだけ表向きにする
             if j == num_cards - 1 {
                 card::flip_card(world, card_id)?;
+                
+                // 表向きのカードが正しくドラッグ可能になっているか確認
+                if let Some(card_info) = world.get_component::<CardInfo>(card_id) {
+                    if card_info.face_up {
+                        // 明示的にドラッグ可能にする
+                        card::set_card_draggable(world, card_id, true)?;
+                        info!("🃏 カードID: {} を表向きにしてドラッグ可能に設定しました", card_id);
+                    }
+                }
             }
             
             // 後でスタックに追加するために一時的に保存
@@ -295,6 +304,10 @@ pub fn draw_from_stock(
     
     // カードを表向きにする
     card::flip_card(world, card_id)?;
+    
+    // 表向きになったカードを明示的にドラッグ可能に設定
+    card::set_card_draggable(world, card_id, true)?;
+    info!("🃏 ストックからウェイストに移動したカードID: {} をドラッグ可能に設定しました", card_id);
     
     // ウェイストにカードを追加
     if let Some(waste) = world.get_component_mut::<StackContainer>(waste_id) {

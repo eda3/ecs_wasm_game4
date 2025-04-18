@@ -202,6 +202,11 @@ impl Game {
                 error!("レンダリング中にエラーが発生しました: {:?}", e);
             }
             
+            // クリック状態をリセット（フレームの最後に呼び出す）
+            if let Some(input_state) = resource_manager.get_mut::<crate::ecs::resources::InputState>() {
+                input_state.reset_click_state();
+            }
+            
             // 次のフレームをリクエスト
             if let Some(ref callback) = *f.borrow() {
                 window.request_animation_frame(callback.as_ref().unchecked_ref()).unwrap();
