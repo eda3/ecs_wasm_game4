@@ -20,8 +20,8 @@ use crate::game::Game;
 pub fn start() {
     // パニック時にエラーメッセージをコンソールに表示するフックを設定
     utils::set_panic_hook();
-    // Rustのロガーを初期化
-    wasm_logger::init(wasm_logger::Config::default());
+    // Rustのロガーを初期化（すべてのログレベルを表示するように設定）
+    wasm_logger::init(wasm_logger::Config::new(log::Level::Trace).message_on_new_line());
     
     info!("🎮 ソリティアゲーム WebAssembly版を初期化中... 🎮");
 }

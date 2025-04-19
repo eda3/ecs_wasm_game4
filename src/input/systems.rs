@@ -184,7 +184,7 @@ impl DragSystem {
             drag_start_position: Vec2::zero(),
             drag_started: false,
             last_mouse_pos: Vec2::zero(),
-            left_button_pressed_prev: false,
+            left_button_pressed_prev: false,  // 明示的にfalseで初期化
             original_z_index: 0,
         }
     }
@@ -1027,9 +1027,10 @@ impl DragSystem {
             None => return Ok(()),
         };
         
-        debug!("🖱️ マウスの状態: 位置=({:.1}, {:.1}), 左ボタン={}, 右ボタン={}", 
+        debug!("🖱️ マウスの状態: 位置=({:.1}, {:.1}), 左ボタン={}, 右ボタン={}, 前回の左ボタン={}, クリック={}", 
             mouse_state.mouse_position.x, mouse_state.mouse_position.y, 
-            mouse_state.mouse_buttons[0], mouse_state.mouse_buttons[2]);
+            mouse_state.mouse_buttons[0], mouse_state.mouse_buttons[2], 
+            self.left_button_pressed_prev, mouse_state.is_mouse_clicked);
         
         // 前のフレームからのマウス位置の変化を計算
         let mouse_delta = Vec2::new(
@@ -1041,9 +1042,10 @@ impl DragSystem {
         // マウスの位置を更新
         self.last_mouse_pos = mouse_state.mouse_position.clone();
         
-        // マウスの左ボタンが押されたとき
-        if mouse_state.mouse_buttons[0] && !self.left_button_pressed_prev {
-            debug!("👇 マウス左ボタンが押されました");
+        // マウスがクリックされたとき（マウスボタン状態の変化または明示的なクリックフラグ）
+        if (mouse_state.mouse_buttons[0] && !self.left_button_pressed_prev) || mouse_state.is_mouse_clicked {
+            debug!("👇 マウスクリックを検出: ボタン状態={}, 前回状態={}, クリックフラグ={}",
+                  mouse_state.mouse_buttons[0], self.left_button_pressed_prev, mouse_state.is_mouse_clicked);
             
             // クリックされたエンティティを検索
             if let Some(entity_id) = self.find_clicked_entity(world, &mouse_state.mouse_position)? {

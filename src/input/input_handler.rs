@@ -112,10 +112,8 @@ impl InputHandler {
             if let Some(input_state) = resources_move.borrow_mut().get_mut::<InputState>() {
                 input_state.update_mouse_position(x, y);
                 
-                // マウスボタンが押されている場合のみログを出力（頻度を抑える）
-                if input_state.is_mouse_down {
-                    debug!("🖱️ マウス移動中: ({}, {}), ドラッグ中: {}", x, y, input_state.is_mouse_down);
-                }
+                // マウスボタンが押されているかどうかに関わらず、マウスの動きをログに記録
+                debug!("🖱️ マウス移動: ({}, {}), ドラッグ中: {}", x, y, input_state.is_mouse_down);
             }
         }) as Box<dyn FnMut(MouseEvent)>);
         
